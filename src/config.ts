@@ -1,4 +1,4 @@
-import avatarImg from './assets/images/site/avatar.svg';
+import avatarImg from './assets/images/site/avatar.png';
 import ogDefaultImg from './assets/images/site/og-default.svg';
 import type { SiteConfig, NavItem, SocialLink, GiscusConfig } from './types/config';
 
@@ -14,7 +14,7 @@ export const SITE_IMAGES = {
   ogDefault: ogDefaultImg,
 } as const;
 
-export const locales = ['en', 'fr'] as const;
+export const locales = ['en'] as const;
 export type Locale = (typeof locales)[number];
 
 /**
@@ -49,16 +49,15 @@ export const SITE: SiteConfig = {
   // ==========================================
 
   /** Default site title used as homepage <title> and meta. */
-  title: 'Chirping Astro',
+  title: 'Shahzar Ahmed',
   /** Site tagline / description. */
-  description:
-    'A modern, multilingual Astro v6 theme inspired by Chirpy — built with Tailwind v4, daisyUI, MDX, Pagefind, and Giscus.',
+  description: 'Mobile engineering notes — Kotlin Multiplatform, Android, iOS',
   /** Author/handle shown in footer + meta. */
   author: {
-    name: 'Chirping Astro',
+    name: 'Shahzar Ahmed',
     url: GITHUB_HANDLE ? `https://github.com/${GITHUB_HANDLE}` : undefined,
     avatar: avatarImg,
-    bio: 'A text-focused Astro V6 theme.',
+    bio: 'Software engineer. Writing about mobile platforms, KMP, and the messy bits of shipping production apps.',
   },
   /** Default OG image. */
   defaultOgImage: ogDefaultImg.src,
@@ -75,7 +74,7 @@ export const SITE: SiteConfig = {
   /** Automatically generate Open Graph images for posts that don't have a `heroImage`. */
   autoOgImage: true,
   /** Show a link to the Privacy Policy page in the footer. */
-  showPrivacyPolicy: true,
+  showPrivacyPolicy: false,
   /** Footer text/link controls. */
   footer: {
     /**
@@ -89,7 +88,7 @@ export const SITE: SiteConfig = {
      */
     rightText: undefined,
     /** Whether to show the Privacy Policy link in the footer. */
-    showPrivacyPolicy: true,
+    showPrivacyPolicy: false,
     /** Whether to show theme credits in the footer right side. Theme <themeName> */
     showThemeCredits: true,
     /** Label for the theme repository link in the right footer line. */
@@ -111,7 +110,7 @@ export const SITE: SiteConfig = {
   /** Default locale. Changing this is a breaking, atomic, multi-file operation. */
   defaultLocale: 'en',
   /** Show the language switcher and link to translated pages. */
-  multilingual: true,
+  multilingual: false,
 };
 
 export const NAV: readonly NavItem[] = [
