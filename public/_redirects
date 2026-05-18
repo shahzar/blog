@@ -1,0 +1,3 @@
+# Astro is built with BASE_PATH=/blog, so all asset URLs are prefixed with /blog/.
+# Rewrite incoming /blog/* requests to the corresponding file in dist/.
+/blog/*  /:splat  200
