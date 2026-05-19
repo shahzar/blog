@@ -1,6 +1,6 @@
 ---
 title: "When the standard mobile OIDC flow doesn't fit"
-description: 'Integrating biometric-required national ID providers in mobile apps — UAE Pass, BankID, Singpass, and others that break the assumptions of ASWebAuthenticationSession and Chrome Custom Tabs.'
+description: 'Integrating biometric-required national ID providers in mobile apps. UAE Pass, BankID, Singpass, and others that break the assumptions of ASWebAuthenticationSession and Chrome Custom Tabs.'
 pubDate: 2026-05-18
 tags: [mobile, oauth, kotlin, android]
 categories: [Mobile]
@@ -9,19 +9,19 @@ toc: true
 
 *Integrating biometric-required national ID providers in mobile apps*
 
-Most "Sign-in with X" tutorials on mobile look the same: open the authorize URL in a system-managed browser, let the OS route the redirect back to your app, exchange the code for tokens. Libraries like AppAuth, kalinjul-oidc, and the platform-native APIs (`ASWebAuthenticationSession` on iOS, Chrome Custom Tabs on Android) all assume the same shape, and when the IdP cooperates, you get a clean ~50-line integration.
+Most "Sign-in with X" estimates start at an afternoon of work and balloon into a full sprint the moment you are assigned a national digital identity system. Providers like UAE Pass, BankID, Singpass, ID.me, and various eKYC systems often look OIDC-shaped on the outside, but thoroughly break the assumptions of standard mobile flows on the inside.
 
-Then you get assigned to integrate a national digital identity system. UAE Pass. BankID. Singpass. ID.me. NemID/MitID. Various eIDAS-tied or eKYC providers. Many of them look OIDC-shaped on the outside but break the assumptions of the standard mobile flow on the inside — and your "afternoon of work" estimate balloons into a sprint.
+Usually, libraries like AppAuth, kalinjul-oidc, and platform-native APIs (`ASWebAuthenticationSession` on iOS, `Chrome Custom Tabs` on Android) all assume the same shape. When the IdP cooperates, you get a clean ~50-line integration. When they don't, you have a project on your hands.
 
 This post is about what to do then. The concrete example is UAE Pass (we just shipped a native integration for it in a Kotlin Multiplatform app), but the constraints and the choices generalize.
 
 ## The standard mobile OIDC flow (a reminder)
 
-What `ASWebAuthenticationSession` / Custom Tabs assume:
+What `ASWebAuthenticationSession` / `Custom Tabs` assume:
 
 1. App opens the authorize URL in a sandboxed system browser
 2. User authenticates (often single-sign-on via shared cookies)
-3. IdP 302s to your `redirect_uri` — a custom scheme or universal link your app owns
+3. IdP 302s to your `redirect_uri`, a custom scheme or universal link your app owns
 4. OS routes that URL back to your app
 5. App exchanges the auth code for tokens
 
@@ -41,28 +41,28 @@ The pattern that breaks standard tools: the IdP requires biometric authenticatio
 The IdP's authorize page detects the authenticator app is installed and tries to invoke it via a custom-scheme deep link (`uaepass://...`, `bankid://...`, etc.). The authenticator app does biometric, then needs to return control. *How* it returns control is what separates well-behaved IdPs from the rest.
 
 Symptoms that you're dealing with one of "the rest":
-- The integration guide explicitly tells you to use a WebView, or ships a vendor SDK that wraps one
-- There's no authorize-endpoint parameter to set `successURL` — the IdP's page emits it server-side as HTTPS, so customizing it means intercepting and rewriting the deep link from a WebView (sandboxed system browsers can't see navigation events)
-- Deep-link schemes are identical across environments — there's no `authn-test://` for staging
-- The vendor SDK ships its own HTTP stack (Retrofit, OkHttp, Alamofire) that conflicts with yours
-- Multiplatform support is uneven: the Android AAR is mature, the iOS pod is a thin afterthought, the docs assume you're on one stack
+- *Forced WebViews:* The integration guide explicitly tells you to use a WebView, or ships a vendor SDK that wraps one.
+- *Hidden Return Paths:* There's no authorize-endpoint parameter to set successURL. The IdP's page emits it server-side as HTTPS, so customizing it means intercepting and rewriting the deep link from a WebView (sandboxed system browsers can't see navigation events).
+- *Static Deep Links:* Deep-link schemes are identical across environments. There's no authn-test:// for staging.
+- *Bloated SDKs:* The vendor SDK ships its own HTTP stack (Retrofit, OkHttp, Alamofire) that conflicts with yours.
+- *Uneven Multiplatform Support:* The Android AAR is mature, the iOS pod is a thin afterthought, and the docs assume you're strictly native.
 
-UAE Pass exhibits all five. So do several other national IdPs.
+Several national IdPs in this category tick all five.
 
 ## The three return-path patterns
 
-Once the authenticator app finishes biometric, it calls `openURL(...)` with some URL. That URL determines how cleanly control returns to your app — and the IdP controls the shape of that URL unless you intervene.
+Once the authenticator app finishes biometric, it calls `openURL(...)` with some URL. That URL determines how cleanly control returns to your app, and the IdP controls the shape of that URL unless you intervene.
 
-**Pattern A — HTTPS resume URL on the IdP's domain (the default for most "non-compliant" IdPs)**
+**Pattern A: HTTPS resume URL on the IdP's domain (the default for most "non-compliant" IdPs)**
 
 - Authenticator → `openURL("https://idp.com/resume?session=XYZ")`
-- OS opens it in Safari/Chrome (not your sandboxed session — that's already dead)
+- OS opens it in Safari/Chrome (your sandboxed session is already dead at that point)
 - IdP's resume page runs in Safari, eventually 302s to your `redirect_uri`
 - OS routes the custom scheme back to your app
 - **UX:** brief Safari/Chrome chrome flash on return
 - **Setup needed:** nothing, this is the IdP's default
 
-**Pattern B — `successURL` is a custom scheme pointing at your app**
+**Pattern B: `successURL` is a custom scheme pointing at your app**
 
 - The IdP lets you specify `successURL=myapp://resume?broker_state=XYZ`
 - Authenticator → `openURL("myapp://resume?...")`
@@ -71,7 +71,7 @@ Once the authenticator app finishes biometric, it calls `openURL(...)` with some
 - **UX:** no flash
 - **Setup needed:** IdP support for custom-scheme `successURL`
 
-**Pattern C — `successURL` is a Universal Link / App Link on a domain you own**
+**Pattern C: `successURL` is a Universal Link / App Link on a domain you own**
 
 - `successURL = https://yourdomain.com/resume?...` with `apple-app-site-association` / Digital Asset Links files served on that domain claiming the path
 - OS sees "this HTTPS URL belongs to App X" → routes directly to your app
@@ -90,7 +90,7 @@ What you pay for it:
 - A second of "where am I?" for the user
 - Whatever custom UI you wanted on the auth screens gets browser chrome instead
 
-For many products, this is fine. Enterprise-internal apps, government-facing apps, B2B tools — ship Pattern A and move on. The "Safari flash" reads worse on paper than it does in practice.
+For many products, this is fine. Enterprise-internal apps, government-facing apps, and B2B tools can ship Pattern A and move on. The "Safari flash" reads worse on paper than it does in practice.
 
 For consumer-facing products where the auth screen is part of the first impression, or where the flash generates support tickets, you'll want Pattern B or C.
 
@@ -103,7 +103,7 @@ Reasons to abandon `ASWebAuthenticationSession` / Custom Tabs:
 3. **UI control**: you want to brand the auth screens or suppress browser chrome entirely
 4. **Embedded intermediate steps**: term acceptance, OTP, etc. that should feel native
 
-Item 2 is the killer. We hit it on UAE Pass: staging URLs emitted `uaepass://` (the prod authenticator's scheme) instead of `uaepassstg://`. Inside a sandboxed system browser, you cannot intercept that — the navigation event is invisible to your app. The only way to rewrite the scheme at runtime is from inside a WebView you control.
+Item 2 is the killer. We hit exactly this: the IdP's staging authorize endpoint emitted the *production* deep-link scheme of the authenticator app, regardless of which environment we hit, so staging builds would launch the production authenticator and talk to its production backend. Inside a sandboxed system browser, you cannot intercept that. The navigation event is invisible to your app. The only way to rewrite the scheme at runtime is from inside a WebView you control.
 
 If your reason for leaving the standard flow is purely UX polish, do the cost-benefit math first. If it's an IdP bug that makes the standard flow unusable, you have no choice.
 
@@ -118,9 +118,9 @@ You pay for it with:
 - Hand-rolled lifecycle: back press, dismissal, errors, timeouts
 - Two implementations (Android `WebView`, iOS `WKWebView`) with subtly different APIs
 - Re-implementing what the system gives you for free: cookie management, security boundaries, redirect handling
-- Audit/compliance scrutiny — some regulators dislike custom WebViews for sensitive flows
+- Audit/compliance scrutiny: some regulators dislike custom WebViews for sensitive flows
 
-Most teams underestimate the second column. We ended up with ~600 lines of platform code for what's conceptually a 50-line integration. Almost all of it is boilerplate around state machines for "user came back from the authenticator," "user cancelled mid-auth," "WebView errored," "lifecycle observer fires while a continuation is pending," etc. None of it is core to auth itself.
+Most teams underestimate the second column. We ended up with ~800 lines of platform code for what's conceptually a 50-line integration. Almost all of it is boilerplate around state machines for "user came back from the authenticator," "user cancelled mid-auth," "WebView errored," "lifecycle observer fires while a continuation is pending," etc. None of it is core to auth itself.
 
 ## The interception pattern in detail
 
@@ -138,6 +138,8 @@ The IdP's page tries to invoke `authn://digitalid?successURL=https://idp.com/res
 8. Your WebView intercepts the `redirect_uri` navigation, extracts the auth code, dismisses the WebView, exchanges the code for tokens
 
 The user sees: your app → authenticator app → your app. No browser flash, no context switch.
+
+(Note: These snippets are written in Kotlin Multiplatform, interacting directly with platform APIs.)
 
 **iOS interception (WKNavigationDelegate):**
 
@@ -194,33 +196,26 @@ These gotchas are where the bulk of the implementation lines go.
 
 ## What to ask your IdP for
 
-If you have any leverage with the IdP's product team — you're integrating a national system in a tier-1 market, or you represent a large user base — these requests would let you skip the WebView entirely:
+If you have any leverage with the IdP's product team (you're integrating a national system in a tier-1 market, or you represent a large user base), these requests would let you skip the WebView entirely:
 
 1. **Expose `successURL` as an authorize-endpoint parameter.** Let the calling SP supply where to return. Standard practice for OIDC brokers.
 2. **Accept custom-scheme `successURL` values.** Gets you to Pattern B without owning a domain.
 3. **Use per-environment deep-link schemes** (`authn://` for prod, `authn-test://` for staging). Lets staging builds coexist with prod.
 4. **Document a Universal Link / App Link path.** If they insist on HTTPS, let it be a domain *you* control.
 
-Realistically, IdPs that pre-date these conventions are slow to retrofit them — they have to coordinate with every SP that depends on the current behavior. But asking is free, and if enough integrators ask, eventually it lands on a roadmap.
+Realistically, IdPs that pre-date these conventions are slow to retrofit them, since they have to coordinate with every SP that depends on the current behavior. But asking is free, and if enough integrators ask, eventually it lands on a roadmap.
 
-## Trade-off summary
+## A note for KMP projects
 
-| Approach | Setup | UX | Reliability | When to pick |
-|---|---|---|---|---|
-| Pattern A (system browser defaults) | Minimal | Browser flash | High (OS owns edge cases) | Most products, enterprise apps |
-| WebView rewrite to Pattern B | High | Seamless | Medium (you own edge cases) | Consumer UX, broken-IdP staging |
-| Pattern C (Universal Links) | Medium (domain + assoc. files) | Seamless | High | When IdP lets you supply the URL |
-| Vendor SDK | Low initially | Varies | Medium (version coupling) | High-quality SDK, single platform |
-
-One KMP-specific note: the vendor SDK path often disqualifies itself on multiplatform projects. The SDKs are typically platform-native (Swift pod for iOS, Java AAR for Android) and don't share well with `commonMain` code. The hand-rolled approach, while more code, lets you push most logic into `commonMain` and isolate just the WebView/lifecycle bits in platform-specific modules.
+The vendor SDK path often disqualifies itself on multiplatform projects. The SDKs are typically platform-native (Swift pod for iOS, Java AAR for Android) and don't share well with `commonMain` code. The hand-rolled approach, while more code, lets you push most logic into `commonMain` and isolate just the WebView/lifecycle bits in platform-specific modules.
 
 ## Closing
 
-The standard mobile OIDC flow is excellent — when your IdP cooperates. When it doesn't, you have real choices to make, and none of them are free.
+The standard mobile OIDC flow is excellent when your IdP cooperates. When it doesn't, you have real choices to make, and none of them are free.
 
 Two things I'd tell my past self before starting this:
 
 1. **Don't reach for the WebView reflexively.** Try Pattern A first. The Safari flash is worse on paper than in person, and the system browser handles a long tail of edge cases for free.
-2. **If you do need the WebView, budget for it properly.** It's not "an afternoon of work." It's a week of building a state machine that handles all the lifecycle weirdness of two apps tag-teaming a user's attention — and you'll find a new edge case on every device family for months.
+2. **If you do need the WebView, budget for it properly.** It's not "an afternoon of work." It's a week of building a state machine that handles all the lifecycle weirdness of two apps tag-teaming a user's attention, and you'll find a new edge case on every device family for months.
 
-The IdP you're integrating may be specific to one country, but the architectural question — "how do I cleanly integrate a third party that doesn't fit the standard tools?" — is universal.
+The IdP you're integrating may be specific to one country, but the underlying architectural question is universal: how do you cleanly integrate a third party that doesn't fit the standard tools?
