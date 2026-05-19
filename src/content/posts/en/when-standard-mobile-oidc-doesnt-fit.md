@@ -42,7 +42,7 @@ The IdP's authorize page detects the authenticator app is installed and tries to
 
 Symptoms that you're dealing with one of "the rest":
 - The integration guide explicitly tells you to use a WebView, or ships a vendor SDK that wraps one
-- The `successURL` parameter is documented as HTTPS only, with no mention of custom schemes
+- There's no authorize-endpoint parameter to set `successURL` — the IdP's page emits it server-side as HTTPS, so customizing it means intercepting and rewriting the deep link from a WebView (sandboxed system browsers can't see navigation events)
 - Deep-link schemes are identical across environments — there's no `authn-test://` for staging
 - The vendor SDK ships its own HTTP stack (Retrofit, OkHttp, Alamofire) that conflicts with yours
 - Multiplatform support is uneven: the Android AAR is mature, the iOS pod is a thin afterthought, the docs assume you're on one stack
